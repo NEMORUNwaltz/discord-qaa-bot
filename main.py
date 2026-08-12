@@ -1,24 +1,26 @@
 import os
 import threading
 from datetime import datetime, timezone, timedelta
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from flask import Flask
 import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-# --- Render & UptimeRobot 用のダミーWebサーバー ---
-class HealthCheckHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"OK")
+# --- Render & UptimeRobot 用のFlask Webサーバー ---
+app = Flask(__name__)
 
-def run_web_server():
-    port = int(os.getenv("PORT", 10000))
-    server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
-    server.serve_forever()
+@app.route('/')
+def home():
+    return "Bot is alive!", 200
 
-threading.Thread(target=run_web_server, daemon=True).start()
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
+
+def keep_alive():
+    t = threading.Thread(target=run_flask)
+    t.daemon = True
+    t.start()
 
 # --- 設定項目 ---
 # 運営陣のロールID（アドミン & 幹部）
@@ -178,8 +180,14 @@ async def setup_ticket(interaction: discord.Interaction):
     await interaction.channel.send(embed=embed, view=TicketPanelView())
     await interaction.followup.send("チケット設置パネルを作成したよ！", ephemeral=True)
 
-TOKEN = os.getenv("DISCORD_TOKEN")
-if TOKEN:
-    bot.run(TOKEN)
-else:
-    print("エラー: DISCORD_TOKEN が設定されていません。")
+# --------------------------------------------------
+# 起動処理
+# --------------------------------------------------
+if __name__ == "__main__":
+    TOKEN = os.getenv("DISCORD_TOKEN")
+    if TOKEN:
+        print("✅ トークンを検知しました。FlaskサーバーとBotを起動します...")
+        keep_alive()
+        bot.run(TOKEN)
+    else:
+        print("❌ エラー: DISCORD_TOKEN が設定されていません。")
